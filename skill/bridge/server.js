@@ -1422,6 +1422,7 @@ const routes = {
 async function onRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const routeKey = `${req.method} ${url.pathname}`;
+  log("info", `REQ ${routeKey} from ${req.socket.remoteAddress}`);
 
   const handler = routes[routeKey];
   if (handler) {
