@@ -22,9 +22,11 @@
 	<string>1</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<!-- NSAllowsArbitraryLoads alone: allows cleartext HTTP to LAN, Tailscale
+		     (100.64.0.0/10 CGNAT) and public hosts. Do NOT add NSAllowsLocalNetworking
+		     here — its presence makes iOS 10+ ignore NSAllowsArbitraryLoads, which
+		     re-blocks the Tailscale range. -->
 		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSBonjourServices</key>
