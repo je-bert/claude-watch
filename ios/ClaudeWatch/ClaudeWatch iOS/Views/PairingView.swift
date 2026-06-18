@@ -218,11 +218,16 @@ struct PairingView: View {
             } catch {
                 await MainActor.run {
                     let msg = error.localizedDescription
-                    // If auto-discovery failed, suggest manual IP
-                    if msg.contains("noServiceFound") || msg.contains("timed out") || msg.contains("not found") {
+                    // Only fall back to manual entry from auto-discovery mode.
+                    if !showManualIP,
+                       msg.contains("noServiceFound") || msg.contains("timed out") || msg.contains("not found") {
                         showManualIP = true
-                        showPairingError("Bridge not found automatically. Enter your Mac's IP address.")
+                        showPairingError("Bridge not found automatically. Enter the bridge address.")
                         isIPFocused = true
+                    } else if showManualIP {
+                        // Manual address didn't respond — most likely wrong IP/port
+                        // or the bridge isn't running there.
+                        showPairingError("Couldn't reach the bridge at that address. Check the IP:port and that the bridge is running.")
                     } else {
                         showPairingError("Connection failed: \(msg)")
                     }
