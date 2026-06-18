@@ -116,7 +116,7 @@ final class RelayService: ObservableObject {
         print("[RelayService] Manual IP pair: \(ip), code: \(code)")
 
         let service = try await discovery.discoverAtIP(ip)
-        bridgeClient.configure(host: service.host, port: service.port)
+        bridgeClient.configure(host: service.host, port: service.port, scheme: service.scheme)
 
         try await bridgeClient.pair(code: code)
 

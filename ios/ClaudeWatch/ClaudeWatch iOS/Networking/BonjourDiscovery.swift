@@ -13,6 +13,7 @@ final class BonjourDiscovery: ObservableObject {
         let host: String
         let port: UInt16
         let machineName: String?
+        var scheme: String = "http"
     }
 
     enum DiscoveryError: LocalizedError {
@@ -65,20 +66,26 @@ final class BonjourDiscovery: ObservableObject {
         }
     }
 
-    /// Tries to connect to a specific IP on ports 7860-7869.
-    func discoverAtIP(_ ip: String) async throws -> DiscoveredService {
-        for port in UInt16(7860)...UInt16(7869) {
-            let url = URL(string: "http://\(ip):\(port)/status")!
+    /// Tries to reach a manually entered address. Accepts a bare IP (legacy:
+    /// http, ports 7860-7869), or an explicit host:port and/or scheme — which
+    /// is what makes a public IP / Tailscale / port-forwarded bridge reachable.
+    func discoverAtIP(_ input: String) async throws -> DiscoveredService {
+        guard let endpoint = BridgeEndpoint.parse(input) else {
+            throw DiscoveryError.noServiceFound
+        }
+        for port in endpoint.candidatePorts {
+            guard let url = endpoint.baseURL(port: port)?.appendingPathComponent("status") else { continue }
             var request = URLRequest(url: url)
             request.timeoutInterval = 3
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                     return DiscoveredService(
-                        name: ip,
-                        host: ip,
+                        name: endpoint.host,
+                        host: endpoint.host,
                         port: port,
-                        machineName: ip
+                        machineName: endpoint.host,
+                        scheme: endpoint.scheme
                     )
                 }
             } catch {

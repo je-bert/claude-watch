@@ -27,6 +27,6 @@
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.shobhit.claudewatch</string>
+	<string>ca.realsync.claudewatch</string>
 </dict>
 </plist>

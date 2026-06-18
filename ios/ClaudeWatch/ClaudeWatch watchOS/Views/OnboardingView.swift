@@ -66,7 +66,7 @@ struct OnboardingView: View {
                     .font(.system(size: 9))
                     .foregroundColor(Theme.Text.dimmed)
 
-                TextField("192.168.1.x", text: $ipAddress)
+                TextField("IP or host:port", text: $ipAddress)
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
                     .foregroundColor(Theme.Text.primary)
                     .multilineTextAlignment(.center)
@@ -106,14 +106,15 @@ struct OnboardingView: View {
     }
 
     private func connectManual() {
-        let ip = ipAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !ip.isEmpty else { return }
+        let raw = ipAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let endpoint = BridgeEndpoint.parse(raw) else { return }
         isSearching = true
         error = nil
 
         Task {
-            for port in 7860...7869 {
-                let url = URL(string: "http://\(ip):\(port)/status")!
+            for port in endpoint.candidatePorts {
+                guard let base = endpoint.baseURL(port: port) else { continue }
+                let url = base.appendingPathComponent("status")
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 3
                 do {
@@ -121,7 +122,7 @@ struct OnboardingView: View {
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                         await MainActor.run {
                             isSearching = false
-                            bridgeURL = URL(string: "http://\(ip):\(port)")
+                            bridgeURL = base
                             codeFocused = true
                         }
                         return
@@ -130,7 +131,7 @@ struct OnboardingView: View {
             }
             await MainActor.run {
                 isSearching = false
-                self.error = "Can't reach \(ip)"
+                self.error = "Can't reach \(endpoint.host)"
             }
         }
     }

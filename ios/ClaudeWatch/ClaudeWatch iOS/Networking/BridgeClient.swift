@@ -47,8 +47,8 @@ final class BridgeClient {
 
     // MARK: - Configuration
 
-    func configure(host: String, port: UInt16) {
-        let urlString = "http://\(host):\(port)"
+    func configure(host: String, port: UInt16, scheme: String = "http") {
+        let urlString = "\(scheme)://\(host):\(port)"
         self.baseURL = URL(string: urlString)
         UserDefaults.standard.set(urlString, forKey: "bridge_url")
     }
