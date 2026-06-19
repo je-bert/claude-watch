@@ -1519,6 +1519,35 @@ async function handleHookError(req, res) {
   return jsonResponse(res, 200, { ok: true });
 }
 
+// Lists candidate folders to start a session in: $HOME, the immediate
+// subdirectories of $HOME and $HOME/repos, plus any active session cwds.
+function handleFolders(req, res) {
+  if (!requireAuth(req)) return jsonResponse(res, 401, { error: "Unauthorized" });
+
+  const home = os.homedir();
+  const bases = [home, path.join(home, "repos")];
+  const seen = new Set();
+  const folders = [];
+  const add = (p, name) => {
+    if (!p || seen.has(p)) return;
+    seen.add(p);
+    folders.push({ path: p, name: name || path.basename(p) || p });
+  };
+
+  add(home, "~ (home)");
+  for (const base of bases) {
+    let entries;
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (e.isDirectory() && !e.name.startsWith(".")) add(path.join(base, e.name));
+    }
+  }
+  for (const [, slot] of sessions) add(slot.cwd);
+
+  folders.sort((a, b) => a.name.localeCompare(b.name));
+  return jsonResponse(res, 200, { folders: folders.slice(0, 60) });
+}
+
 function handleStatus(_req, res) {
   const mostRecentRunningSession = findMostRecentRunningSession();
   return jsonResponse(res, 200, {
@@ -1550,6 +1579,7 @@ const routes = {
   "POST /hooks/task-complete": handleHookTaskComplete,
   "POST /hooks/error": handleHookError,
   "GET /status": handleStatus,
+  "GET /folders": handleFolders,
 };
 
 async function onRequest(req, res) {

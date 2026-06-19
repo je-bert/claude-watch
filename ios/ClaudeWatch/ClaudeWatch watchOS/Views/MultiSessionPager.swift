@@ -2,18 +2,24 @@ import SwiftUI
 
 struct MultiSessionPager: View {
     @EnvironmentObject private var state: WatchViewState
+    @State private var showFolderPicker = false
 
     var body: some View {
-        if state.sessions.isEmpty {
-            waitingView
-        } else {
-            TabView(selection: $state.activeSessionIndex) {
-                ForEach(Array(state.sessions.enumerated()), id: \.element.id) { index, _ in
-                    SessionView(sessionIndex: index)
-                        .tag(index)
+        Group {
+            if state.sessions.isEmpty {
+                waitingView
+            } else {
+                TabView(selection: $state.activeSessionIndex) {
+                    ForEach(Array(state.sessions.enumerated()), id: \.element.id) { index, _ in
+                        SessionView(sessionIndex: index)
+                            .tag(index)
+                    }
                 }
+                .tabViewStyle(.page)
             }
-            .tabViewStyle(.page)
+        }
+        .sheet(isPresented: $showFolderPicker) {
+            FolderPickerView()
         }
     }
 
@@ -29,9 +35,9 @@ struct MultiSessionPager: View {
                 .foregroundColor(.white.opacity(0.3))
                 .multilineTextAlignment(.center)
 
-            // …or spawn one right here, from the watch.
+            // …or spawn one right here, from the watch — pick the folder first.
             Button {
-                state.spawnSession()
+                showFolderPicker = true
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "plus.circle.fill")

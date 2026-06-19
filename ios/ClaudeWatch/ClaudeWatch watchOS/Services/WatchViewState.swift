@@ -1,10 +1,22 @@
 import SwiftUI
 import WatchConnectivity
 
+/// A folder on the Mac the bridge can start a session in.
+struct BridgeFolder: Identifiable, Codable, Hashable {
+    let path: String
+    let name: String
+    var id: String { path }
+}
+
+struct FoldersResponse: Codable {
+    let folders: [BridgeFolder]
+}
+
 class WatchViewState: ObservableObject {
     static let shared = WatchViewState()
 
     @Published var isPaired: Bool = false
+    @Published var folders: [BridgeFolder] = []
     @Published var sessionState: SessionState = .disconnected
     @Published var terminalLines: [TerminalLine] = [] // Legacy: flat view of all output
     @Published var pendingApproval: ApprovalRequest? = nil
@@ -417,7 +429,7 @@ class WatchViewState: ObservableObject {
     /// Asks the bridge to spawn a fresh agent session (owns a PTY, so its full
     /// output — including Claude's text replies — streams back to the watch).
     /// The bridge defaults the working directory to the Mac's home folder.
-    func spawnSession(agent: String = "claude") {
+    func spawnSession(agent: String = "claude", cwd: String? = nil) {
         guard let baseURL = bridge.baseURL, let token = bridge.token else { return }
 
         let url = baseURL.appendingPathComponent("command")
@@ -425,13 +437,29 @@ class WatchViewState: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["spawn": agent])
+        var payload: [String: Any] = ["spawn": agent]
+        if let cwd, !cwd.isEmpty { payload["cwd"] = cwd }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
         HapticManager.commandSent()
         URLSession.shared.dataTask(with: request) { _, _, error in
             if let error {
                 print("[WatchViewState] Spawn failed: \(error)")
             }
+        }.resume()
+    }
+
+    /// Loads the list of folders the bridge can start a session in.
+    func loadFolders() {
+        guard let baseURL = bridge.baseURL, let token = bridge.token else { return }
+        let url = baseURL.appendingPathComponent("folders")
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let data,
+                  let decoded = try? JSONDecoder().decode(FoldersResponse.self, from: data)
+            else { return }
+            DispatchQueue.main.async { self?.folders = decoded.folders }
         }.resume()
     }
 
