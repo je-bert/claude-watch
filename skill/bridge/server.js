@@ -398,10 +398,20 @@ function killSession(sessionId) {
 
 function findSessionByCwd(cwd) {
   if (!cwd) return null;
+  // Reuse the existing session for this folder regardless of state — prefer a
+  // running one, otherwise revive the most recent stopped/ended one — so the
+  // same folder keeps ONE page instead of opening a new one after every stop.
+  let running = null;
+  let fallback = null;
   for (const [, slot] of sessions) {
-    if (slot.cwd === cwd && slot.state === "running") return slot;
+    if (slot.cwd !== cwd) continue;
+    if (slot.state === "running") {
+      if (!running || slot.createdAt > running.createdAt) running = slot;
+    } else if (!fallback || slot.createdAt > fallback.createdAt) {
+      fallback = slot;
+    }
   }
-  return null;
+  return running || fallback;
 }
 
 function findMostRecentActiveSession() {
@@ -1269,9 +1279,21 @@ function resolveHookSession(body) {
   const cwd = body.session_cwd || body.cwd || null;
   const source = body.source || "claude";
 
-  // Try exact cwd match first
+  // Try exact cwd match first — reuse (and revive) that folder's page.
   const match = findSessionByCwd(cwd);
-  if (match) return match.id;
+  if (match) {
+    if (match.state !== "running") {
+      match.state = "running";
+      match.idleNotified = false;
+      pushSseEvent("session", {
+        state: "running",
+        agent: match.agent,
+        cwd: match.cwd,
+        folderName: match.folderName,
+      }, match.id);
+    }
+    return match.id;
+  }
 
   // Fallback: if exactly one running session, use it
   const active = findMostRecentActiveSession();
