@@ -1311,6 +1311,9 @@ async function handleHookToolOutput(req, res) {
 
   const sid = resolveHookSession(body);
   const source = body.source || "claude";
+  // Activity resumed — re-arm the idle marker so the next real stop shows once.
+  const activeSlot = sid ? sessions.get(sid) : null;
+  if (activeSlot) activeSlot.idleNotified = false;
   log("info", `Hook: ${source === "codex" ? "Codex" : "PostToolUse"} received [${source}]${sid ? ` session=${sid}` : ""}`, body.tool_name || "");
   pushSseEvent("tool-output", { ...body, source }, sid);
   return jsonResponse(res, 200, { ok: true });
@@ -1382,6 +1385,14 @@ async function handleHookStop(req, res) {
   }
 
   const sid = resolveHookSession(body);
+  // Idle prompts fire a "stop" repeatedly (~every 60s) while waiting for input.
+  // Only forward the first one per idle period so the watch doesn't fill with
+  // "— stopped —" lines. Any new activity re-arms it (see handleHookToolOutput).
+  const slot = sid ? sessions.get(sid) : null;
+  if (slot && slot.idleNotified) {
+    return jsonResponse(res, 200, { ok: true });
+  }
+  if (slot) slot.idleNotified = true;
   log("info", `Hook: Stop received${sid ? ` session=${sid}` : ""}`);
   pushSseEvent("stop", body, sid);
   return jsonResponse(res, 200, { ok: true });
