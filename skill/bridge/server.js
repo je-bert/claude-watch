@@ -1389,10 +1389,13 @@ function forwardAssistantResponse(transcriptPath, sid, slot) {
   }
 
   const lines = raw.split("\n");
-  let text = null;
+  const parts = [];
   let marker = null;
 
-  // Walk backwards to the most recent assistant message that has text blocks.
+  // Walk backwards collecting ALL assistant text from the current turn, i.e.
+  // everything after the user prompt that started it — not just the final
+  // block (which alone reads like a summary). Tool-result entries (role
+  // "user" with tool_result content) are NOT real prompts, so we skip them.
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     if (!line) continue;
@@ -1400,23 +1403,34 @@ function forwardAssistantResponse(transcriptPath, sid, slot) {
     try { entry = JSON.parse(line); } catch { continue; }
 
     const msg = entry.message;
+    const role = entry.type || (msg && msg.role);
+
+    if (role === "user" || (msg && msg.role === "user")) {
+      const isToolResult =
+        msg && Array.isArray(msg.content) &&
+        msg.content.length > 0 &&
+        msg.content.every((b) => b && b.type === "tool_result");
+      if (isToolResult) continue;   // tool output, keep walking
+      break;                        // a real prompt → start of the turn
+    }
+
     const isAssistant =
       entry.type === "assistant" || (msg && msg.role === "assistant");
     if (!isAssistant || !msg || !Array.isArray(msg.content)) continue;
 
-    const parts = msg.content
+    const texts = msg.content
       .filter((b) => b && b.type === "text" && typeof b.text === "string")
       .map((b) => b.text.trim())
       .filter(Boolean);
 
-    if (parts.length) {
-      text = parts.join("\n");
-      marker = entry.uuid || entry.timestamp || text.slice(0, 64);
-      break;
+    if (texts.length) {
+      if (!marker) marker = entry.uuid || entry.timestamp || texts.join("").slice(0, 64);
+      parts.unshift(texts.join("\n"));   // prepend — we're walking backwards
     }
   }
 
-  if (!text) return;
+  if (!parts.length) return;
+  const text = parts.join("\n\n");
   // Don't re-send the same reply (Stop can fire more than once for a turn).
   if (slot) {
     if (slot.lastAssistantMarker === marker) return;
