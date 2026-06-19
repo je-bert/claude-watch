@@ -17,6 +17,7 @@ class WatchViewState: ObservableObject {
 
     @Published var isPaired: Bool = false
     @Published var folders: [BridgeFolder] = []
+    @Published var showFolderPicker: Bool = false
     @Published var sessionState: SessionState = .disconnected
     @Published var terminalLines: [TerminalLine] = [] // Legacy: flat view of all output
     @Published var pendingApproval: ApprovalRequest? = nil

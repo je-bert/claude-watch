@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MultiSessionPager: View {
     @EnvironmentObject private var state: WatchViewState
-    @State private var showFolderPicker = false
 
     var body: some View {
         Group {
@@ -18,7 +17,7 @@ struct MultiSessionPager: View {
                 .tabViewStyle(.page)
             }
         }
-        .sheet(isPresented: $showFolderPicker) {
+        .sheet(isPresented: $state.showFolderPicker) {
             FolderPickerView()
         }
     }
@@ -37,7 +36,7 @@ struct MultiSessionPager: View {
 
             // …or spawn one right here, from the watch — pick the folder first.
             Button {
-                showFolderPicker = true
+                state.showFolderPicker = true
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "plus.circle.fill")

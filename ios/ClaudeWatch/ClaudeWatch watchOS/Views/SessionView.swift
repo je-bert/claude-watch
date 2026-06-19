@@ -90,6 +90,23 @@ struct SessionView: View {
 
                 Spacer()
 
+                // New session button (center) — pick a folder, start Claude there.
+                Button { session.showFolderPicker = true } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.Accent.success.opacity(0.85))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.black)
+                    }
+                    .contentShape(Circle())
+                    .shadow(color: .black.opacity(0.6), radius: 6, y: 3)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
                 // Mic button (right)
                 Button { showVoiceInput = true } label: {
                     ZStack {
