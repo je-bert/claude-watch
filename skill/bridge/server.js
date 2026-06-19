@@ -1375,6 +1375,57 @@ async function handleHookPermission(req, res) {
   return jsonResponse(res, 200, hookResponse);
 }
 
+// Reads the last assistant text reply from a Claude Code transcript (JSONL)
+// and streams it to clients as terminal output — so the watch/phone shows
+// Claude's actual answers, not just its tool calls. De-duplicated per session.
+function forwardAssistantResponse(transcriptPath, sid, slot) {
+  if (!transcriptPath || typeof transcriptPath !== "string") return;
+
+  let raw;
+  try {
+    raw = fs.readFileSync(transcriptPath, "utf-8");
+  } catch {
+    return;
+  }
+
+  const lines = raw.split("\n");
+  let text = null;
+  let marker = null;
+
+  // Walk backwards to the most recent assistant message that has text blocks.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+
+    const msg = entry.message;
+    const isAssistant =
+      entry.type === "assistant" || (msg && msg.role === "assistant");
+    if (!isAssistant || !msg || !Array.isArray(msg.content)) continue;
+
+    const parts = msg.content
+      .filter((b) => b && b.type === "text" && typeof b.text === "string")
+      .map((b) => b.text.trim())
+      .filter(Boolean);
+
+    if (parts.length) {
+      text = parts.join("\n");
+      marker = entry.uuid || entry.timestamp || text.slice(0, 64);
+      break;
+    }
+  }
+
+  if (!text) return;
+  // Don't re-send the same reply (Stop can fire more than once for a turn).
+  if (slot) {
+    if (slot.lastAssistantMarker === marker) return;
+    slot.lastAssistantMarker = marker;
+  }
+
+  pushSseEvent("pty-output", { text: `\n${text}\n` }, sid);
+}
+
 async function handleHookStop(req, res) {
   if (req.method !== "POST") return jsonResponse(res, 405, { error: "Method not allowed" });
   let body;
@@ -1394,6 +1445,10 @@ async function handleHookStop(req, res) {
   }
   if (slot) slot.idleNotified = true;
   log("info", `Hook: Stop received${sid ? ` session=${sid}` : ""}`);
+  // Forward Claude's actual text reply (read from the conversation transcript),
+  // not just its tool calls — so clients show what Claude *said*, not only what
+  // it did.
+  forwardAssistantResponse(body.transcript_path, sid, slot);
   pushSseEvent("stop", body, sid);
   return jsonResponse(res, 200, { ok: true });
 }
