@@ -210,7 +210,9 @@ class WatchViewState: ObservableObject {
                     options: .regularExpression
                 ).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !cleaned.isEmpty {
-                    appendLine(TerminalLine(text: String(cleaned.prefix(80)), type: .output), sessionId: sessionId)
+                    // Keep the full reply (tap-to-expand reveals it). Cap only to
+                    // avoid a pathologically huge single line.
+                    appendLine(TerminalLine(text: String(cleaned.prefix(4000)), type: .output), sessionId: sessionId)
                 }
             }
 

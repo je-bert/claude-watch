@@ -5,6 +5,7 @@ struct SessionView: View {
     @EnvironmentObject private var session: WatchViewState
 
     @State private var showVoiceInput = false
+    @State private var expandedLines: Set<UUID> = []
     @State private var cursorVisible = true
     private let cursorTimer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
 
@@ -127,12 +128,19 @@ struct SessionView: View {
 
     @ViewBuilder
     private func terminalLine(_ line: TerminalLine) -> some View {
+        let expanded = expandedLines.contains(line.id)
         Text(line.text)
             .font(.system(size: 11, design: .monospaced))
             .foregroundColor(colorForLine(line))
-            .lineLimit(4)
+            .lineLimit(expanded ? nil : 4)
             .truncationMode(.tail)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if expanded { expandedLines.remove(line.id) }
+                else { expandedLines.insert(line.id) }
+            }
     }
 
     private func colorForLine(_ line: TerminalLine) -> Color {
