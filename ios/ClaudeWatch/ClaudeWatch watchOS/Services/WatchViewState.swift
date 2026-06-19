@@ -410,6 +410,29 @@ class WatchViewState: ObservableObject {
         }
     }
 
+    // MARK: - Spawn session
+
+    /// Asks the bridge to spawn a fresh agent session (owns a PTY, so its full
+    /// output — including Claude's text replies — streams back to the watch).
+    /// The bridge defaults the working directory to the Mac's home folder.
+    func spawnSession(agent: String = "claude") {
+        guard let baseURL = bridge.baseURL, let token = bridge.token else { return }
+
+        let url = baseURL.appendingPathComponent("command")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["spawn": agent])
+
+        HapticManager.commandSent()
+        URLSession.shared.dataTask(with: request) { _, _, error in
+            if let error {
+                print("[WatchViewState] Spawn failed: \(error)")
+            }
+        }.resume()
+    }
+
     // MARK: - Permission response
 
     func respondToPermissionWithOption(_ optionLabel: String, index: Int) {

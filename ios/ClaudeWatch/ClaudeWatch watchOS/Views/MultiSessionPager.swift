@@ -28,6 +28,23 @@ struct MultiSessionPager: View {
                 .font(.system(size: 9))
                 .foregroundColor(.white.opacity(0.3))
                 .multilineTextAlignment(.center)
+
+            // …or spawn one right here, from the watch.
+            Button {
+                state.spawnSession()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("New Claude")
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Color.white.opacity(0.9)))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
