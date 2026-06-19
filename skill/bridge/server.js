@@ -73,13 +73,41 @@ const CODEX_SESSION_BOOTSTRAP_LOOKBACK_MS = 30 * 60 * 1000;
 const CODEX_SESSION_SCAN_LIMIT = 25;
 const CODEX_SESSION_ROOT = path.join(os.homedir(), ".codex", "sessions");
 const CODEX_LOG_FILE = path.join(os.homedir(), ".codex", "log", "codex-tui.log");
-const BRIDGE_ID = crypto.randomUUID();
+// Persist identity + paired token across restarts so the watch/phone stays
+// paired (no re-pairing needed after a reboot or service restart).
+const STATE_FILE = path.join(os.homedir(), ".claude-watch-bridge.json");
+
+function loadPersistedState() {
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8")) || {};
+  } catch {
+    return {};
+  }
+}
+
+function savePersistedState() {
+  try {
+    fs.writeFileSync(
+      STATE_FILE,
+      JSON.stringify({ bridgeId: BRIDGE_ID, sessionTokens }, null, 2),
+      { mode: 0o600 }
+    );
+  } catch (err) {
+    log("warn", `Could not persist bridge state: ${err.message}`);
+  }
+}
+
+const _persisted = loadPersistedState();
+const BRIDGE_ID = _persisted.bridgeId || crypto.randomUUID();
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
-let sessionToken = null;
+// Multiple paired devices (iPhone + watch + …) each get their own token.
+let sessionTokens = Array.isArray(_persisted.sessionTokens)
+  ? _persisted.sessionTokens
+  : (_persisted.sessionToken ? [_persisted.sessionToken] : []);
 let pairingCode = null;
 let pairingCodeExpiresAt = 0;
 
@@ -138,7 +166,10 @@ function generatePairingCode() {
 
 function generateSessionToken() {
   const token = crypto.randomBytes(32).toString("hex");
-  sessionToken = token;
+  sessionTokens.push(token);
+  // Cap the list so it can't grow unbounded across many re-pairings.
+  if (sessionTokens.length > 10) sessionTokens = sessionTokens.slice(-10);
+  savePersistedState();
   return token;
 }
 
@@ -164,7 +195,7 @@ function requireAuth(req) {
   const auth = req.headers["authorization"];
   if (!auth || !auth.startsWith("Bearer ")) return false;
   const token = auth.slice(7);
-  return token === sessionToken && sessionToken !== null;
+  return sessionTokens.includes(token);
 }
 
 function jsonResponse(res, status, body) {

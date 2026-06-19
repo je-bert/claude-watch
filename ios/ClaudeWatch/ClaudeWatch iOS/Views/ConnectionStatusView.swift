@@ -142,7 +142,9 @@ private struct SessionPageView: View {
 
     @State private var cursorVisible = true
     @State private var promptText = ""
+    @State private var composeText = ""
     @FocusState private var isPromptFocused: Bool
+    @FocusState private var isComposeFocused: Bool
 
     private let cursorTimer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
 
@@ -170,7 +172,50 @@ private struct SessionPageView: View {
             // Terminal
             terminalView
                 .padding(.horizontal, 16)
+
+            // Compose bar — write/dictate a prompt to Claude
+            composeBar
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
         }
+    }
+
+    // MARK: - Compose bar
+
+    private var composeBar: some View {
+        HStack(spacing: 8) {
+            TextField("Message Claude…", text: $composeText, axis: .vertical)
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .tint(Color.claudeOrange)
+                .lineLimit(1...4)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .focused($isComposeFocused)
+                .submitLabel(.send)
+                .onSubmit { sendComposed() }
+
+            Button { sendComposed() } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(composeIsEmpty ? Color.subtleText : Color.claudeOrange)
+            }
+            .disabled(composeIsEmpty)
+        }
+    }
+
+    private var composeIsEmpty: Bool {
+        composeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func sendComposed() {
+        let text = composeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        relayService.sendCommand(text: text, sessionId: session.id.isEmpty ? nil : session.id)
+        composeText = ""
+        isComposeFocused = false
     }
 
     // MARK: - Session header

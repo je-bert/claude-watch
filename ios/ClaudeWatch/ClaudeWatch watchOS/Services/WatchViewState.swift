@@ -29,19 +29,31 @@ class WatchViewState: ObservableObject {
 
     private init() {
         if bridge.isPaired {
-            Task {
-                let reachable = await verifyBridge()
-                await MainActor.run {
-                    if reachable {
-                        isPaired = true
-                        startEventStream()
-                    } else {
-                        bridge.unpair()
-                        isPaired = false
-                    }
-                }
-            }
+            // We have saved credentials. Keep them and connect — never wipe the
+            // saved IP/token just because the bridge is momentarily unreachable
+            // (e.g. right after a reboot, before Tailscale / the bridge is back).
+            // Otherwise the user has to re-enter the IP every time.
+            isPaired = true
+            Task { await connectWithRetry() }
         }
+    }
+
+    /// Waits (with backoff) for the bridge to become reachable, then starts the
+    /// event stream. Never clears the saved pairing on a transient failure —
+    /// only an actual 401 from the bridge (handleTokenRejected) resets pairing.
+    private func connectWithRetry() async {
+        var attempt = 0
+        while attempt < 40 {
+            if await verifyBridge() {
+                await MainActor.run { self.startEventStream() }
+                return
+            }
+            attempt += 1
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+        // Still unreachable after retrying: keep the saved IP+token regardless
+        // so the user never has to re-enter it; reconnects on next launch.
+        await MainActor.run { self.startEventStream() }
     }
 
     private func verifyBridge() async -> Bool {

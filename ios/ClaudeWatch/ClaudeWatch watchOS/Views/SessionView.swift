@@ -68,22 +68,24 @@ struct SessionView: View {
             }
             .background(Theme.Background.primary)
 
-            // FAB buttons
+            // FAB buttons — larger, fully tappable hit targets, lifted off the
+            // curved bottom edge so taps register reliably on watchOS.
             HStack {
                 // Clear button (left)
                 Button { session.clearTerminal(sessionId: agentSession.id) } label: {
                     ZStack {
                         Circle()
-                            .fill(Theme.Text.secondary.opacity(0.5))
-                            .frame(width: 28, height: 28)
+                            .fill(Theme.Text.secondary.opacity(0.6))
+                            .frame(width: 40, height: 40)
                         Image(systemName: "trash")
-                            .font(.system(size: 11))
+                            .font(.system(size: 15))
                             .foregroundColor(.white)
                     }
+                    .contentShape(Circle())
                     .shadow(color: .black.opacity(0.6), radius: 6, y: 3)
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 16)
+                .padding(.leading, 14)
 
                 Spacer()
 
@@ -91,19 +93,21 @@ struct SessionView: View {
                 Button { showVoiceInput = true } label: {
                     ZStack {
                         Circle()
-                            .fill(Theme.Text.primary.opacity(0.75))
-                            .frame(width: 28, height: 28)
+                            .fill(Theme.Text.primary.opacity(0.85))
+                            .frame(width: 40, height: 40)
                         Image(systemName: "mic.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: 16))
                             .foregroundColor(.black)
                     }
+                    .contentShape(Circle())
                     .shadow(color: .black.opacity(0.6), radius: 6, y: 3)
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 16)
+                .padding(.trailing, 14)
             }
             .frame(maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 16)
+            .padding(.bottom, 6)
+            .allowsHitTesting(true)
         }
         .ignoresSafeArea(edges: .bottom)
         .sheet(item: $session.pendingApproval) { request in
